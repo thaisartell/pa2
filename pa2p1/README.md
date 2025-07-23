@@ -2,16 +2,16 @@
 Richard Sartell, Kip Schetnan
 
 ## x500:
-sarte016,
+sarte016, schet076
 
 ## Division of task across members
-Richard: queue structure/creation, queue functions, queue initialization/assignment, some sync stuff (creating mutexes, some locking), worker_thread function
+Richard: queue structure/creation, queue functions, queue initialization/assignment, some sync stuff (creating mutexes, some locking), worker_thread function.
 
-Kip:
+Kip: Implemented the main function.
 
 ## Lab machine used for testing purpose.
 Richard: Linux Mint 21.3 OS
-Kip:
+Kip: login01
 
 ## Design specifications: Mention your project design in details and mention any challenges faced.
 
@@ -20,4 +20,4 @@ Richard: ChatGPT gave me the idea a circular buffer would be easiest to use. Hel
 
 ## Anything the TA should know about.
 Richard: N/A.
-Kip:
+Kip: N/A.

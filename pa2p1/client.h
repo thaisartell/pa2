@@ -2,16 +2,22 @@
 #define CLIENT_H
 
 #include <pthread.h>
+#include <stdbool.h>
 
 #define CHUNK_SIZE 1024
+
+pthread_mutex_t mutex;
+bool done;
 
 // Structure for a chunk of data
 // Add any code you think necessary to implement your design
 typedef struct chunk {
     /*
-    value: numerical value carried by chunk
+    count: how many actual bytes are in data
+    data: holds acquired data chunks
     */
-    int value;
+    int count;
+    char data[CHUNK_SIZE];
 } chunk_t;
 
 // Structure for the queue
@@ -29,8 +35,6 @@ typedef struct queue {
     int tail;
     chunk_t** data;  // Array of pointers to chunks
 } queue_t;
-
-pthread_mutex_t mutex;
 
 // Function prototypes
 queue_t* create_queue(int capacity);

@@ -9,7 +9,6 @@
 // Global variables
 queue_t *chunk_queue;
 int digit_counts[10] = {0};
-done = false;
 /*
 cond_available: a chunk is available for processing 
 cond_incoming: queue has items
@@ -31,13 +30,9 @@ queue_t* create_queue(int capacity) {
 
 void destroy_queue(queue_t *q) {
     // TODO: Free queue memory
-    if (q == NULL) {
-        return;
-    }
-    if (done) {
-        free(q->data);
-        free(q);
-    }
+    if (q == NULL) return;
+    free(q->data);
+    free(q);
 }
 
 int enqueue(queue_t *q, chunk_t *chunk) {
@@ -66,6 +61,7 @@ chunk_t* dequeue(queue_t *q) {
 // Worker thread function
 void* worker_thread(void *arg) {
     int thread_id = *(int*)arg;
+    printf("Thread %d started\n", thread_id);
     // TODO: Main worker loop
     while (1) {
         pthread_mutex_lock(&mutex);
@@ -85,7 +81,9 @@ void* worker_thread(void *arg) {
         pthread_mutex_lock(&mutex);
         for (i = 0; i < chunk->count; i++) {
             digit = chunk->data[i];
-            digit_counts[digit - '0']++;
+            if (digit >= '0' && digit <= '9') {
+                digit_counts[digit - '0']++;
+            }
         }
         pthread_mutex_unlock(&mutex);
         free(chunk);
@@ -105,29 +103,66 @@ int main(int argc, char *argv[]) {
     int qsize = atoi(argv[2]);
     int nthreads = atoi(argv[3]);
     int client_id = atoi(argv[4]);
+
+    pthread_mutex_init(&mutex, NULL);
+    done = false;
     
     // TODO: Initialize synchronization primitives
-        
+    pthread_mutex_init(&mutex, NULL);
     // TODO: Create queue
     chunk_queue = create_queue(qsize);
 
     // TODO: Create worker threads
-        
-    // TODO: Open and read file in chunks
-    FILE* fp = fopen(filepath, 'r');
-    // TODO: Read file in 1024-byte chunks
+    pthread_t threads[nthreads];
+    int thread_ids[nthreads];
+    for (int i = 0; i < nthreads; i++) {
+        thread_ids[i] = i;
+        pthread_create(&threads[i], NULL, worker_thread, &thread_ids[i]);
+    }
 
+    // TODO: Open and read file in chunks
+    FILE* fp = fopen(filepath, "r");
+    if (fp == NULL) {
+        perror("The file failed to open");
+        return 1;
+    }
+    // TODO: Read file in 1024-byte chunks
     // TODO: Operates as the producer
-    
+    while (1) {
+        chunk_t *chunk = malloc(sizeof(chunk_t));
+        if (!chunk) break;
+        chunk->count = fread(chunk->data, sizeof(unsigned char), 1024, fp);
+        if (chunk->count == 0) {
+            free(chunk);
+            break;
+        }
+
+        pthread_mutex_lock(&mutex);
+        while (chunk_queue->size == chunk_queue->capacity) {
+            pthread_cond_wait(&cond_available, &mutex);
+        }
+        enqueue(chunk_queue, chunk);
+        pthread_cond_signal(&cond_incoming);
+        pthread_mutex_unlock(&mutex);
+    }
+
     // TODO: When all bytes have been read from the file and placed into the
     // queue, Signal completion and wait for workers
-        
+    pthread_mutex_lock(&mutex);
+    done = true;
+    pthread_cond_broadcast(&cond_incoming);
+    pthread_mutex_unlock(&mutex);
+
+    for (int i = 0; i < nthreads; i++) {
+        pthread_join(threads[i], NULL);
+    }
     // TODO: Print results
-        
+    printf("Digit counts for client %d:\n", client_id);
+    for (int i = 0; i < 10; i++) {
+        printf("%d: %d\n", i, digit_counts[i]);
+    }
     // TODO: Cleanup
     fclose(fp);
-    done = true;
-
     // Destroy mutexes and condition variables
     // Free allocated memory
     destroy_queue(chunk_queue);

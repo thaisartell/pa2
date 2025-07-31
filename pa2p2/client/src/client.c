@@ -10,18 +10,18 @@ void *processChunks(void *args) {
         int local_digits[DIGIT] = {0};
         pthread_mutex_lock(&mutex);
         
-        // Wait for chunks to be available or for processing to be done
+        // wait for main to add chunks (condvar)
         while(q->empty && !done) {
             pthread_cond_wait(&cond_wait_qempty, &mutex);
         }
         
-        // Check exit condition
+        // done condition (a variable and condvar)
         if(done && q->empty) {
             pthread_mutex_unlock(&mutex);
             break;
         }
         
-        // Get chunk from queue
+        // pick chunk from queue and signal main about available free spot
         memcpy(local_chunk, q->chunk, 1024);
         
         // Update queue state
@@ -32,21 +32,20 @@ void *processChunks(void *args) {
         pthread_cond_signal(&cond_wait_qfull);
         pthread_mutex_unlock(&mutex);
         
-        // Process the chunk (count digits)
+        // store the per digit count 
         for(int i = 0; i < 1024; i++) {
-            if ((q->chunk[i] != ' ') && (q->chunk[i] != '\0')) {
-                pthread_mutex_lock(&mutex);
-                local_digits[q->chunk[i] - '0']++;
-                pthread_mutex_unlock(&mutex);
+            if ((local_chunk[i] != ' ') && (local_chunk[i] != '\0')) {
+                local_digits[local_chunk[i]- '0']++;
             }
         }
         
-        // Update global digit count
         pthread_mutex_lock(&chunkmutex);
         for (int i = 0; i < DIGIT; i++) {
             digits[i] += local_digits[i];
         }
         pthread_mutex_unlock(&chunkmutex);
+
+        // Critical sections which are independent should be handled independently
     }
     return NULL;
 }
@@ -64,16 +63,12 @@ int main(int argc, char *argv[]) {
     int nthreads = atoi(argv[3]);
     int clientid = atoi(argv[4]);
     int serverport = atoi(argv[5]);
-    
-    // Initialize variables
     int ret;
     done = false;
     char buffer[1024];
     size_t bytes;
     req_message_t req;
     resp_message_t resp;
-    
-    // Initialize mutexes and condition variables
     pthread_mutex_init(&mutex, NULL);
     pthread_mutex_init(&clientmutex, NULL);
     pthread_mutex_init(&chunkmutex, NULL);
@@ -109,13 +104,16 @@ int main(int argc, char *argv[]) {
             pthread_cond_wait(&cond_wait_qfull, &mutex);
         }
         memcpy(q->chunk, buffer, bytes);
-        pthread_cond_signal(&cond_wait_qempty);
-        pthread_mutex_unlock(&mutex);
         q->size++;
         q->full = true;
         q->empty = false;
+        pthread_cond_signal(&cond_wait_qempty);
+        pthread_mutex_unlock(&mutex);
     }
+    pthread_mutex_lock(&mutex);
     done=true;
+    pthread_cond_broadcast(&cond_wait_qempty);
+    pthread_mutex_unlock(&mutex);
     fclose(file);
 
     // Graceful exit condition for threads?
@@ -146,7 +144,7 @@ int main(int argc, char *argv[]) {
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_port = htons(serverport);
     serveraddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-    ret = connect(sockfd, &serveraddr, sizeof(serveraddr));
+    ret = connect(sockfd, (struct sockaddr*) &serveraddr, sizeof(serveraddr));
     if (ret == -1) {
         perror("Socket connection error");
         free(q);
@@ -270,7 +268,6 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     
-    // Cleanup
     close(sockfd);
     free(q);
     pthread_mutex_destroy(&mutex);

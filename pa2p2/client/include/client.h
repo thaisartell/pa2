@@ -11,23 +11,46 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #define DIGIT 10
 
 // Queue structure, feel free to modify accoding to your requirements
 struct QueueStruct {
+    /*
+    Circular buffer implementation
+    head: index of frontal element; consumers will grab from the head.
+    tail: index of rear element; producers will add to the tail
+    size: current number of elements in queue
+    capacity: total possible size of queue
+    empty: true if empty, else false
+    full: true if full, else false
+    chunks: array of data
+     */
+    int size;
+    bool empty;
+    bool full;
     char chunk[1024];
 };
+
+struct QueueStruct* q;
+
+char* getChunk(struct QueueStruct*);
 
 // Shared data structure to keep track of the digit count
 int digits[DIGIT] = {0};
 
 // Mutex variables
+pthread_mutex_t mutex;
+pthread_mutex_t clientmutex;
+pthread_mutex_t chunkmutex;
 
 // Condition variables
+pthread_cond_t cond_wait_qempty;
+pthread_cond_t cond_wait_qfull;
 
 // Graceful exit
-
+bool done;
 
 // REQUEST CODE
 #define REGISTER 1

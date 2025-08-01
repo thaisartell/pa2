@@ -4,7 +4,7 @@ qsize=5
 nthreads=10
 nclients=2
 port=8080
-testpath=../testcase/t2/client
+testpath=../testcases/t2/client
 outpath=output/client
 pgm=./client
 
